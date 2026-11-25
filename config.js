@@ -10,6 +10,3 @@ window.STONY_CONFIG = {
   supabaseUrl: 'https://omkmkahoflbzockilduq.supabase.co',
   supabaseAnonKey: 'sb_publishable_BMSSjJfUO7zt8GWsfqBf6Q__5wLCZ1Q',
 };
-
-',
-};
