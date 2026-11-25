@@ -7,6 +7,8 @@
 //  Tant que ces valeurs ne sont pas remplies, le site tourne en mode démonstration.
 // =====================================================================
 window.STONY_CONFIG = {
-  supabaseUrl: 'https://VOTRE-PROJET.supabase.co',
-  supabaseAnonKey: 'VOTRE_CLE_ANON_PUBLIQUE',
+  supabaseUrl: 'https://omkmkahoflbzockilduq.supabase.co/rest/v1/',
+  supabaseAnonKey: 'sb_publishable_BMSSjJfUO7zt8GWsfqBf6Q__5wLCZlQ
+
+',
 };
