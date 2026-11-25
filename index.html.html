@@ -1197,6 +1197,23 @@ table.t td{color:var(--ink)}
 @media (max-width:640px){.cathero .art,.cathero p{display:none}.cathero .in{padding:12px 16px}.cathero h1{font-size:1.25rem}}
 .pcrumbs button{min-height:40px}
 .fcols .flogo-chip{display:inline-block;padding:10px 14px}.sitemap a{border-color:var(--line-strong)}
+/* v5 : filtres en haut sur téléphone et tablette */
+.lb-row{display:none}
+@media (max-width:1250px){
+ .mobile-bar{display:none!important}
+ .locbar{flex-wrap:wrap}
+ .lb-row{display:flex;gap:8px;width:100%;padding:4px 2px 2px;border-top:1px solid var(--line)}
+ .lb-chip{flex:1;justify-content:center;border:1px solid var(--line-strong)!important;border-radius:10px!important;background:var(--soft)!important;font-weight:700;color:var(--heading)!important;min-height:44px}
+ .lb-chip em{font-style:normal;background:var(--red);color:#fff;border-radius:10px;font-size:.72rem;padding:1px 7px}
+ .platform.show-map .locbar{position:fixed;top:calc(66px + env(safe-area-inset-top));left:8px;right:8px;z-index:900;margin:0}
+ .platform.show-map .mapcol{inset:calc(66px + env(safe-area-inset-top)) 0 0 0}
+}
+@media (max-width:640px){.locbar .lb-place{flex:1 1 calc(100% - 60px)}.locbar .lb-budget{flex:1 1 calc(100% - 60px);border-left:0;border-top:1px solid var(--line);border-radius:0}.locbar .lb-edit{position:absolute;right:10px;top:10px;width:44px;height:44px;padding:0}.locbar{position:relative}}
+@media (max-width:860px){
+ .filters{top:0;height:100vh;height:100dvh;padding-bottom:calc(30px + env(safe-area-inset-bottom));z-index:1600}
+ .platform.show-filters::before{content:'';position:fixed;inset:0;background:rgba(6,12,26,.5);z-index:1550}
+}
+@media (max-width:420px){.cattabs a.on span.lbl{display:none}}
 </style>
 </head>
 <body>
@@ -2053,15 +2070,20 @@ function renderCat(cat) {
       el.addEventListener('mouseleave', () => { const p = $(`[data-pin="${el.dataset.id}"]`); if (p) p.classList.remove('hl'); });
     });
   }
+  function nActive() { let n = 0; if (f.near) n++; if (f.q) n++; Object.values(f.x || {}).forEach((v) => { if (v) n++; }); return n; }
   function drawLocbar() {
     $('#locbar').innerHTML = `<button type="button" class="lb-place" data-openpicker>${I('pin')}<span><small>${t('f.place')}</small><b>${esc(placeLabel(f))}</b></span></button>
       <button type="button" class="lb-budget" data-openpicker>${I('tag')}<span><small>${t('f.budget')}</small><b>${esc(budgetLabel(f))}</b></span></button>
-      <button type="button" class="btn btn-blue lb-edit" data-openpicker>${I('edit')} <span>Modifier</span></button>`;
+      <button type="button" class="btn btn-blue lb-edit" data-openpicker>${I('edit')} <span>Modifier</span></button>
+      <div class="lb-row"><button type="button" class="lb-chip" data-openf2>${I('filter')} Tous les filtres${nActive() ? ` <em>${nActive()}</em>` : ''}</button><button type="button" class="lb-chip" data-togglemap2>${I('map')} <span>${$('#plat') && $('#plat').classList.contains('show-map') ? t('f.list') : t('f.map')}</span></button></div>`;
   }
   function refreshNear() { $('#nearbox').innerHTML = nearBox(f); $('#nearbox').classList.toggle('on', !!(f.near && ME)); }
   refresh(true); drawLocbar();
   const repaint = () => { $('#locsel').innerHTML = locSelects(f); $('#pricebox').innerHTML = priceBox(cat); wirePrice(); $$('[data-tx] button').forEach((b) => b.classList.toggle('on', b.dataset.v === f.tx)); refreshNear(); refresh(true); drawLocbar(); };
-  $('#locbar').addEventListener('click', (e) => { if (e.target.closest('[data-openpicker]')) openPicker(cat, () => { Object.assign(f, F[cat]); F[cat] = f; repaint(); }); });
+  $('#locbar').addEventListener('click', (e) => {
+    if (e.target.closest('[data-openf2]')) { $('#plat').classList.add('show-filters'); return; }
+    if (e.target.closest('[data-togglemap2]')) { const p = $('#plat'); p.classList.toggle('show-map'); drawLocbar(); if (map) setTimeout(() => { map.invalidateSize(); refresh(true); }, 80); return; }
+    if (e.target.closest('[data-openpicker]')) openPicker(cat, () => { Object.assign(f, F[cat]); F[cat] = f; repaint(); }); });
   if (first && location.hash.indexOf('nopick') < 0) setTimeout(() => openPicker(cat, () => { Object.assign(f, F[cat]); F[cat] = f; repaint(); }), 150);
   // Événements filtres
   const FI = $('#filters');
