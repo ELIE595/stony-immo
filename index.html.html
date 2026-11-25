@@ -1711,7 +1711,15 @@ const Cloud = {
     const isPhone = /^[+\d\s().-]+$/.test(raw) && raw.replace(/\D/g, '').length >= 9;
     const email = raw.includes('@') ? raw.toLowerCase() : isPhone ? phoneEmail(raw) : adminEmail(raw);
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if (error) return { error: cerr(error) };
+    if (error) {
+      const m = (error.message || '') + ' ' + (error.code || '');
+      if (admin) return { error: /Invalid login|invalid_credentials/i.test(m) ? `Mot de passe incorrect, ou aucun compte avec l’identifiant « ${email} ».` : /not confirmed|email_not_confirmed/i.test(m) ? 'Compte non confirmé : cochez « Auto Confirm User » ou confirmez-le dans Supabase.' : 'Erreur Supabase : ' + cerr(error) };
+      return { error: cerr(error) };
+    }
+    const pr = await sb.from('profiles').select('id,role,banned').eq('id', data.user.id).maybeSingle();
+    if (admin && pr.error) { await sb.auth.signOut(); return { error: 'La base ne répond pas correctement (' + cerr(pr.error) + '). Avez-vous bien exécuté schema.sql ?' }; }
+    if (admin && !pr.data) { await sb.auth.signOut(); return { error: 'Mot de passe correct, mais ce compte n’a pas de profil dans la table « profiles ». Relancez la commande SQL de réparation.' }; }
+    if (admin && pr.data.role !== 'admin') { await sb.auth.signOut(); return { error: 'Mot de passe correct, mais ce compte n’est pas administrateur (rôle actuel : ' + pr.data.role + '). Relancez la commande SQL « role = admin ».' }; }
     const u = await Cloud.loadMe(data.user.id);
     if (!u || u.banned || (admin ? u.role !== 'admin' : u.role === 'admin')) { await sb.auth.signOut(); DB.session = DB.adminSession = null; return { error: u && u.banned ? 'Ce compte est suspendu.' : 'Identifiants incorrects.' }; }
     await Cloud.loadListings(); return {};
@@ -2604,11 +2612,11 @@ function renderPage(slug) {
 function renderAdminLogin() {
   if (adminUser()) { location.hash = '#/' + SET().adminCode + '/tableau'; return; }
   APP.innerHTML = `<div class="tri"></div><div class="adm-login"><div class="lk">${I('lock', 'width:26px;height:26px')}</div><img src="${LOGO}" alt="" style="height:44px;margin:0 auto 10px"><h1 style="font-size:1.4rem">Espace de gestion</h1><p class="small muted">Accès réservé à l’administration de Stony Immo.</p>
-    <form id="alog" style="text-align:left"><div class="fg"><label>${CLOUD ? 'Identifiant administrateur (nom ou téléphone)' : 'Identifiant'}</label><input class="input" name="login" required autocomplete="username"></div><div class="fg"><label>Mot de passe</label><input class="input" name="pass" type="password" required autocomplete="current-password"></div><button class="btn btn-navy btn-block btn-lg">Entrer</button></form>
+    <form id="alog" style="text-align:left"><div class="fg"><label>${CLOUD ? 'Identifiant administrateur (nom ou téléphone)' : 'Identifiant'}</label><input class="input" name="login" required autocomplete="username"></div><div class="fg"><label>Mot de passe</label><input class="input" name="pass" type="password" required autocomplete="current-password"></div><button class="btn btn-navy btn-block btn-lg">Entrer</button><div id="alogmsg" class="near-box" style="margin-top:12px;background:var(--red-50);border-color:#F5C2CB;color:#8A0E22;text-align:left" hidden></div></form>
     <p style="margin-top:16px"><a class="small" href="#/">← Retour au site</a></p></div>`;
   $('#alog').onsubmit = async (e) => {
     e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const id = d.login.trim().toLowerCase();
-    if (CLOUD) { const btn = e.target.querySelector('button'); busy(btn, true, 'Vérification…'); const res = await Cloud.signIn(id, d.pass, true); busy(btn, false); if (res.error) return toast('Accès refusé.', 'err'); renderAdmin._at = 0; location.hash = '#/' + SET().adminCode + '/tableau'; return; }
+    if (CLOUD) { const btn = e.target.querySelector('button'); busy(btn, true, 'Vérification…'); const res = await Cloud.signIn(id, d.pass, true); busy(btn, false); if (res.error) { const m = $('#alogmsg'); if (m) { m.textContent = res.error; m.hidden = false; } return toast('Accès refusé.', 'err'); } renderAdmin._at = 0; location.hash = '#/' + SET().adminCode + '/tableau'; return; }
     const u = DB.users.find((x) => x.role === 'admin' && (x.email === id || x.phone === id));
     if (!u || u.pass !== pw(d.pass)) { toast('Accès refusé.', 'err'); return; }
     DB.adminSession = u.id; save(); location.hash = '#/' + SET().adminCode + '/tableau';
