@@ -1649,6 +1649,7 @@ const CFG = window.STONY_CONFIG || {};
 const CLOUD = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && !/VOTRE|xxxx/i.test(CFG.supabaseUrl + CFG.supabaseAnonKey));
 let sb = null;
 function normPhone(p) { let s = String(p || '').replace(/[^\d+]/g, ''); if (s.startsWith('00')) s = '+' + s.slice(2); if (/^0\d{9}$/.test(s)) s = '+243' + s.slice(1); if (/^243\d{9}$/.test(s)) s = '+' + s; if (/^\d{9}$/.test(s)) s = '+243' + s; return s; }
+const adminEmail = (name) => String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9._-]/g, '') + '@admin.stonyimmo.cd';
 const phoneEmail = (p) => normPhone(p).replace(/[^\d]/g, '') + '@membres.stonyimmo.cd';
 const uid = (v) => (CLOUD ? v : +v);
 const fromRow = (r) => ({ id: r.id, cat: r.cat, owner: r.owner, title: r.title, desc: r.descr || '', tx: r.tx, price: +r.price, cur: r.cur, period: r.period, prov: r.prov, ville: r.ville, commune: r.commune || '', quartier: r.quartier || '', adresse: r.adresse || '',
@@ -1695,7 +1696,9 @@ const Cloud = {
     await Cloud.loadMe(data.user.id); await Cloud.loadListings(); return {};
   },
   async signIn(login, pass, admin) {
-    const email = login.includes('@') ? login.trim().toLowerCase() : phoneEmail(login);
+    const raw = login.trim();
+    const isPhone = /^[+\d\s().-]+$/.test(raw) && raw.replace(/\D/g, '').length >= 9;
+    const email = raw.includes('@') ? raw.toLowerCase() : isPhone ? phoneEmail(raw) : adminEmail(raw);
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) return { error: cerr(error) };
     const u = await Cloud.loadMe(data.user.id);
@@ -2590,7 +2593,7 @@ function renderPage(slug) {
 function renderAdminLogin() {
   if (adminUser()) { location.hash = '#/' + SET().adminCode + '/tableau'; return; }
   APP.innerHTML = `<div class="tri"></div><div class="adm-login"><div class="lk">${I('lock', 'width:26px;height:26px')}</div><img src="${LOGO}" alt="" style="height:44px;margin:0 auto 10px"><h1 style="font-size:1.4rem">Espace de gestion</h1><p class="small muted">Accès réservé à l’administration de Stony Immo.</p>
-    <form id="alog" style="text-align:left"><div class="fg"><label>${CLOUD ? 'Téléphone administrateur' : 'Identifiant'}</label><input class="input" name="login" required autocomplete="username"></div><div class="fg"><label>Mot de passe</label><input class="input" name="pass" type="password" required autocomplete="current-password"></div><button class="btn btn-navy btn-block btn-lg">Entrer</button></form>
+    <form id="alog" style="text-align:left"><div class="fg"><label>${CLOUD ? 'Identifiant administrateur (nom ou téléphone)' : 'Identifiant'}</label><input class="input" name="login" required autocomplete="username"></div><div class="fg"><label>Mot de passe</label><input class="input" name="pass" type="password" required autocomplete="current-password"></div><button class="btn btn-navy btn-block btn-lg">Entrer</button></form>
     <p style="margin-top:16px"><a class="small" href="#/">← Retour au site</a></p></div>`;
   $('#alog').onsubmit = async (e) => {
     e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const id = d.login.trim().toLowerCase();
@@ -2645,7 +2648,7 @@ function renderAdmin(tab) {
     content = `<div class="panel"><h2>${I('settings')} Réglages du site</h2><form id="sform">
       <h3 style="font-size:1rem;margin:6px 0 10px">Accès administrateur (caché)</h3>
       <div class="row3"><div class="fg"><label>Code secret de l’adresse</label><input class="input" name="adminCode" value="${esc(SET().adminCode)}" required><div class="help">Adresse : …stony-immo.html#/<b>${esc(SET().adminCode)}</b></div></div>
-      ${CLOUD ? `<div class="fg"><label>Identifiant admin</label><input class="input" value="${esc(u.phone)}" readonly><div class="help">Votre numéro de téléphone</div></div>` : `<div class="fg"><label>Identifiant admin (e-mail)</label><input class="input" name="adminEmail" value="${esc(u.email)}" required></div>`}
+      ${CLOUD ? `<div class="fg"><label>Identifiant admin</label><input class="input" value="${esc(u.phone || 'votre nom d’administrateur')}" readonly><div class="help">Identifiant de connexion</div></div>` : `<div class="fg"><label>Identifiant admin (e-mail)</label><input class="input" name="adminEmail" value="${esc(u.email)}" required></div>`}
       <div class="fg"><label>Nouveau mot de passe admin</label><input class="input" type="password" name="adminPass" minlength="8" autocomplete="new-password" placeholder="8 caractères minimum"></div></div>
       <h3 style="font-size:1rem;margin:14px 0 10px">Société et coordonnées</h3>
       <div class="row3"><div class="fg"><label>Nom de la société</label><input class="input" name="company" value="${esc(SET().company)}"></div><div class="fg"><label>Forme juridique (SARL, SAS…)</label><input class="input" name="legalForm" value="${esc(SET().legalForm)}"></div><div class="fg"><label>Fondateur / directeur</label><input class="input" name="founder" value="${esc(SET().founder)}"></div></div>
